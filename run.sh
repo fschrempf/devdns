@@ -9,6 +9,8 @@ read -r -a extrahosts <<< "$EXTRA_HOSTS"
 
 dnsmasq_pid=""
 dnsmasq_path="/etc/dnsmasq.d/"
+resolvConfigFile="/tmp/resolv.conf"
+resolvComment="# added by devdns"
 
 RESET="\e[0;0m"
 RED="\e[0;31;49m"
@@ -28,6 +30,12 @@ reload_dnsmasq(){
 }
 shutdown(){
   echo "Shutting down..."
+  local tmpFile="${resolvConfigFile}.tmp"
+  if [[ -f $resolvConfigFile ]]; then
+    cat $resolvConfigFile > $tmpFile
+    sed -i "/$resolvComment/d" $tmpFile
+    cat $tmpFile > $resolvConfigFile
+  fi
   kill $dnsmasq_pid
   exit 0
 }
@@ -174,6 +182,18 @@ EOF
 EOF
  echo ""
 }
+setResolvConf(){
+  local tmpFile="${resolvConfigFile}.tmp"
+  
+  if [[ -f $resolvConfigFile ]]; then
+    cat $resolvConfigFile > $tmpFile
+    sed -i "/$resolvComment/d" $tmpFile
+    local localIp=$(hostname -i)
+    sed -i "1i nameserver $localIp $resolvComment" $tmpFile
+    cat $tmpFile > $resolvConfigFile
+    echo -e "${YELLOW}~ Add $localIp as nameserver in resolv.conf"
+  fi
+}
 
 set -Eeo pipefail
 print_startup_msg
@@ -181,6 +201,7 @@ set_fallback_dns
 add_wildcard_record
 set_extra_records
 start_dnsmasq
+setResolvConf
 set +Eeo pipefail
 
 add_running_containers
